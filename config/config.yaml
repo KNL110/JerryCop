@@ -1,0 +1,22 @@
+Proxy:
+    ProxyPort: 
+    NumWorkers: 10
+    MaxConcReq: 1000
+    
+
+Servers:
+    Server1:
+        ServerPorts: []
+        Names: []
+        Routing:
+            Prefix:
+            ProxyPass: [] # list of servers
+            ProxyHeaders:   #Strings
+                Host:  
+                XRealIP:
+                XForwardedFor:
+    Server2:
+
+
+
+    
