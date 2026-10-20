@@ -1,38 +1,56 @@
 package protocol
 
 import (
+	"errors"
 	"net"
 	"sync"
-	"errors"
+
+	"github.com/google/uuid"
 )
 
 type TCPListener struct {
-	ListenAddr string
-	Listener net.Listener
+	ListenAddr   string
+	Listener     net.Listener
 	RequestsChan chan<- []byte
 }
 
-func NewTCPListener (listenaddress ListenAddr) TCPListener {
+func NewTCPListener(listenaddress ListenAddr) TCPListener {
 	NewTCPListener := TCPListener{
 		ListenAddr: listenaddress,
 	}
+
+	return NewTCPListener
 }
 
-func (t *TCPListener) AcceptLoop (LocalMaxConcListener *sync.WaitGroup) Error{
-	defer LocalMaxConcListener.Done()
-	ln, err := net.Listen("tcp", t.ListenAddr)
+func handleConnection(conn net.Conn) error {
+
+	GetServer()
+	// send to this
+	return errors.New("trouble handling connection")
+}
+
+func (t *TCPListener) Listen(MaxConcReq int, LocalMaxConcListener *sync.WaitGroup) error {
+	sem := make(chan string, MaxConcReq)
+	var err error
+	t.Listener, err = net.Listen("tcp", t.ListenAddr)
 	if err != nil {
-		return errors.New("Encountered an error while listening ")
+		return err
 	}
+
 	for {
-		
+		conn, err := t.Listener.Accept()
+		if err != nil {
+			return err
+		}
+		sem <- uuid.NewString()
+		go func(connection net.Conn) error {
+			defer func() {
+				<-sem
+				connection.Close()
+			}()
+
+			return handleConnection(connection)
+		}(conn)
 	}
-}
 
-func (*TCPListener) Listen (MaxConcReq int, LocalMaxConcListener *sync.WaitGroup) {
-	if (int(LocalMaxConcListener.state[0:32]) <= MaxConcReq) {
-		LocalMaxConcListener.Add(1)
-		go actuallyListen()
-
-		
 }

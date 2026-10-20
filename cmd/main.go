@@ -9,14 +9,14 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+
 	"github.com/google/uuid"
-	
+
 	_ "github.com/joho/godotenv"
 )
 
 func main() {
 
-		
 	// Step1: Load Config
 	LocalProxy := configparser.LoadConfig()
 
@@ -24,7 +24,7 @@ func main() {
 	RequestsChan := make(chan []byte, 10000)
 
 	// Step3: Spawn Workers
-	jobWorkers := make([]*workers.Worker,LocalProxy.NumWorkers)
+	jobWorkers := make([]*workers.Worker, LocalProxy.NumWorkers)
 	var workersWg sync.WaitGroup
 	var maxConcListener sync.WaitGroup
 
