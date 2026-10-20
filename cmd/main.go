@@ -26,16 +26,15 @@ func main() {
 	// Step3: Spawn Workers
 	jobWorkers := make([]*workers.Worker, LocalProxy.NumWorkers)
 	var workersWg sync.WaitGroup
-	var maxConcListener sync.WaitGroup
 
 	for _, jobWorkerPtr := range jobWorkers {
 		jobWorkerPtr = &(workers.Worker{Id: uuid.NewString()})
 		go jobWorkerPtr.Start(&LocalProxy, RequestsChan)
-		workersWg.add(1)
+		workersWg.Add(1)
 	}
 
 	// Step4: spawn Listener
-	Listener := protocol.TCPListener
+	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort,LocalProxy.NumWorkers)
 	Listener.Listen()
 
 	// Close the channel and exit the process when interrupted.
