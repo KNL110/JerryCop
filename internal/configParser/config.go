@@ -2,10 +2,11 @@ package configparser
 
 import (
 	"os"
-
+	
 	"gopkg.in/yaml.v3"
 )
 
+// Note to self: Based on the layout of config.yaml
 type Proxy struct {
 	ProxyPort    string                  `yaml:"ProxyPort"`
 	NumWorkers   int                     `yaml:"NumWorkers"`
@@ -32,7 +33,6 @@ type ProxyHeader struct {
 	XForwardedFor string `yaml:"XForwardedFor"`
 }
 
-// Note to self: Based on the layout of config.yaml
 type configFile struct {
 	Proxy struct {
 		ProxyPort  string `yaml:"ProxyPort"`

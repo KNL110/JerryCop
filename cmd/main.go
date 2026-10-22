@@ -1,7 +1,8 @@
 package main
 
 import (
-	"JerryCop/cmd/workers"
+	request "JerryCop/cmd/request"
+	workers "JerryCop/cmd/workers"
 	configparser "JerryCop/internal/configParser"
 	"JerryCop/internal/protocol"
 	"fmt"
@@ -18,10 +19,16 @@ import (
 func main() {
 
 	// Step1: Load Config
-	LocalProxy := configparser.LoadConfig()
+	LocalProxy, err := configparser.LoadConfig()
+
+	if err != nil {
+		fmt.Println("Error loading config:", err)
+		os.Exit(1)
+	}
 
 	// Step2: Create Dedicated Channel
-	RequestsChan := make(chan []byte, 10000)
+	RequestsChan := make(chan []request.RequestsJob, LocalProxy.MaxConcReq)
+	// RequestsChan := make(chan []byte, 10000)
 
 	// Step3: Spawn Workers
 	jobWorkers := make([]*workers.Worker, LocalProxy.NumWorkers)
@@ -34,7 +41,11 @@ func main() {
 	}
 
 	// Step4: spawns Listener and listens to the incoming requests.
-	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort, LocalProxy.NumWorkers)
+	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort, LocalProxy.NumWorkers, RequestsChan)
+	if Listener == nil {
+		fmt.Printf("Error creating Listener for port %s", LocalProxy.ProxyPort)
+		os.Exit(1)
+	}
 	Listener.Listen()
 
 	// Close the channel and exit the process when interrupted.

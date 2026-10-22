@@ -4,15 +4,21 @@ import (
 	"net/http"
 	"time"
 	"github.com/gorilla/mux"
+	"JerryCop/cmd/request"
 )
 
 
 type HTTPListener struct {
 	Server *http.Server
+	RequestsChan chan<- request.RequestsJob
 }
 
-func NewHTTPListener(listenAddr string,MaxConcReq int) *HTTPListener {
+func NewHTTPListener(listenAddr string, MaxConcReq int, RequestsChan chan<- request.RequestsJob) *HTTPListener {
 	mux := mux.NewRouter()
+
+	if RequestsChan == nil {
+		return nil
+	}
 
 	Limit := limitMiddleware(MaxConcReq,mux)
 	NewHTTPListener := HTTPListener{
@@ -23,6 +29,7 @@ func NewHTTPListener(listenAddr string,MaxConcReq int) *HTTPListener {
 			ReadTimeout:  time.Second * 10,
 			IdleTimeout:  time.Minute,
 		},
+		RequestsChan: RequestsChan,
 	}
 
 	return &NewHTTPListener
