@@ -1,4 +1,4 @@
-package cmd
+package main
 
 import (
 	"JerryCop/cmd/workers"
@@ -27,14 +27,14 @@ func main() {
 	jobWorkers := make([]*workers.Worker, LocalProxy.NumWorkers)
 	var workersWg sync.WaitGroup
 
-	for _, jobWorkerPtr := range jobWorkers {
-		jobWorkerPtr = &(workers.Worker{Id: uuid.NewString()})
-		go jobWorkerPtr.Start(&LocalProxy, RequestsChan)
+	for i := range jobWorkers {
+		jobWorkers[i] = &(workers.Worker{Id: uuid.NewString()})
+		go jobWorkers[i].Start(&LocalProxy, RequestsChan, &workersWg)
 		workersWg.Add(1)
 	}
 
-	// Step4: spawn Listener
-	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort,LocalProxy.NumWorkers)
+	// Step4: spawns Listener and listens to the incoming requests.
+	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort, LocalProxy.NumWorkers)
 	Listener.Listen()
 
 	// Close the channel and exit the process when interrupted.

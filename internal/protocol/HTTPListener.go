@@ -29,7 +29,7 @@ func NewHTTPListener(listenAddr string,MaxConcReq int) *HTTPListener {
 }
 
 func limitMiddleware(maxConcurrent int, next http.Handler) http.Handler {
-	// A buffered channel acts as our semaphore
+	// A buffered channel acts as an semaphore
 	semaphore := make(chan struct{}, maxConcurrent)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
