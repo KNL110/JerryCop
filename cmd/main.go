@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// Step2: Create Dedicated Channel
-	RequestsChan := make(chan []request.RequestsJob, LocalProxy.MaxConcReq)
+	RequestsChan := make(chan request.RequestsJob, LocalProxy.MaxConcReq)
 	// RequestsChan := make(chan []byte, 10000)
 
 	// Step3: Spawn Workers
