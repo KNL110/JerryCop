@@ -6,6 +6,7 @@ import (
 	configparser "JerryCop/internal/configParser"
 	"JerryCop/internal/protocol"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -36,25 +37,37 @@ func main() {
 
 	for i := range jobWorkers {
 		jobWorkers[i] = &(workers.Worker{Id: uuid.NewString()})
-		go jobWorkers[i].Start(&LocalProxy, RequestsChan, &workersWg)
 		workersWg.Add(1)
+		go jobWorkers[i].Start(&LocalProxy, RequestsChan, &workersWg)
 	}
 
 	// Step4: spawns Listener and listens to the incoming requests.
-	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort, LocalProxy.NumWorkers, RequestsChan)
+	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort, LocalProxy.MaxConcReq, RequestsChan)
 	if Listener == nil {
-		fmt.Printf("Error creating Listener for port %s", LocalProxy.ProxyPort)
+		fmt.Printf("Error creating Listener for port %s\n", LocalProxy.ProxyPort)
 		os.Exit(1)
 	}
-	Listener.Listen()
 
-	// Close the channel and exit the process when interrupted.
-	// Will have to implement a more graceful shutdown later.
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 
-	close(RequestsChan)
+	go func() {
+		if err := Listener.Listen(); err != nil && err != http.ErrServerClosed {
+			fmt.Println("Listener error:", err)
+		}
+	}()
+
 	fmt.Println("Blocking, press ctrl+c to continue...")
 	<-done
-	fmt.Println("\nInterrupted!")
+	fmt.Println("Interrupted! Shutting down...")
+
+	// Stop the Listener
+	_ = Listener.Server.Close()
+
+	// Tell the workers threads to stop taking the requests.
+	close(RequestsChan)
+	// Wait till the worker threads are done with their workload.
+	workersWg.Wait()
+
+	fmt.Println("All workers finished. Exiting.")
 }
