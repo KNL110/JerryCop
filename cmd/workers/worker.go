@@ -12,6 +12,26 @@ import (
 	"time"
 )
 
+var defaultTransport = &http.Transport{
+	Proxy:               http.ProxyFromEnvironment,
+	MaxIdleConns:        10000,
+	MaxIdleConnsPerHost: 1000,
+	IdleConnTimeout:     90 * time.Second,
+}
+
+var defaultClient = &http.Client{
+	Transport: defaultTransport,
+	Timeout:   30 * time.Second,
+}
+
+// 32KB buffer that can be shared
+var bufferPool = sync.Pool{
+	New: func() any {
+		b := make([]byte, 32*1024)
+		return &b
+	},
+}
+
 // Workers are taking Requests till the Channel is open.
 type Worker struct {
 	Id string
@@ -20,14 +40,19 @@ type Worker struct {
 func (w *Worker) Start(ProxySettings *configParser.Proxy, RequestsChan <-chan request.RequestsJob, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
+	var jobWg sync.WaitGroup
 
 	for Req := range RequestsChan {
-		w.handleJob(&Req, client, ProxySettings)
+		// made a copy
+		job := Req
+		jobWg.Add(1)
+		go func() {
+			defer jobWg.Done()
+			w.handleJob(&job, defaultClient, ProxySettings)
+		}()
 	}
 
+	jobWg.Wait()
 	fmt.Println("Worker stopped")
 }
 
@@ -59,7 +84,10 @@ func forwardRequest(job *request.RequestsJob, client *http.Client, targetURL str
 
 	copyHeaders(resp.Header, job.Writer.Header())
 	job.Writer.WriteHeader(resp.StatusCode)
-	io.Copy(job.Writer, resp.Body)
+
+	buf := bufferPool.Get().(*[]byte)
+	defer bufferPool.Put(buf)
+	io.CopyBuffer(job.Writer, resp.Body, *buf)
 }
 
 func copyHeaders(src, dest http.Header) {
