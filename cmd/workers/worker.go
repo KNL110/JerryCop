@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// Shared connection interface
+// Idle connections are kept alive so they can be reused
+// instead of creating new connection.
 var defaultTransport = &http.Transport{
 	Proxy:               http.ProxyFromEnvironment,
 	MaxIdleConns:        10000,
@@ -19,6 +22,7 @@ var defaultTransport = &http.Transport{
 	IdleConnTimeout:     90 * time.Second,
 }
 
+// Shared HTTP Client
 var defaultClient = &http.Client{
 	Transport: defaultTransport,
 	Timeout:   30 * time.Second,
@@ -37,6 +41,15 @@ type Worker struct {
 	Id string
 }
 
+// Start consumes jobs from RequestsChan and processes them concurrently.
+//
+// For each received job, Start launches a goroutine to handle it. When the
+// channel is closed and all queued jobs have been received, Start waits for
+// all jobs launched by this worker to finish before returning.
+//
+// Note: There is no limit to the number of concurrent
+// jobs handled by a worker concurrently, that is but still it is capped by 
+// the number of jobs in the channel which has an limit on it
 func (w *Worker) Start(ProxySettings *configParser.Proxy, RequestsChan <-chan request.RequestsJob, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -56,6 +69,13 @@ func (w *Worker) Start(ProxySettings *configParser.Proxy, RequestsChan <-chan re
 	fmt.Println("Worker stopped")
 }
 
+// HandleJob determines the internal servers' destination for a request and forwards it.
+//
+// The router uses the job and proxy configuration to determine the target URL.
+// forwardRequest then sends the request to that destination and writes the
+// internal server's response to the client's ResponseWriter.
+//
+// Closing job.Done tells that this job is finished.
 func (w *Worker) handleJob(job *request.RequestsJob, client *http.Client, ProxySettings *configParser.Proxy) {
 	defer close(job.Done)
 
@@ -66,6 +86,11 @@ func (w *Worker) handleJob(job *request.RequestsJob, client *http.Client, ProxyS
 	forwardRequest(job, client, forwardPath)
 }
 
+// ForwardRequest sends an incoming request to a internal server and relays
+// the internal server's response to the original client.
+//
+// It copies the incoming headers, executes the request using client,
+// and then copies the response headers and status code to job.Writer and sends to client
 func forwardRequest(job *request.RequestsJob, client *http.Client, targetURL string) {
 	upstreamReq, err := http.NewRequest(job.Req.Method, targetURL, job.Req.Body)
 	if err != nil {
@@ -90,6 +115,8 @@ func forwardRequest(job *request.RequestsJob, client *http.Client, targetURL str
 	io.CopyBuffer(job.Writer, resp.Body, *buf)
 }
 
+// This function does not clear existing destination headers or filter
+// hop-by-hop headers.
 func copyHeaders(src, dest http.Header) {
 	for k, vv := range src {
 		for _, v := range vv {
