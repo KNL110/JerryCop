@@ -20,7 +20,7 @@ import (
 func main() {
 
 	// Step1: Load Config
-	LocalProxy, err := configparser.LoadConfig()
+	ProxySettings, err := configparser.LoadConfig()
 
 	if err != nil {
 		fmt.Println("Error loading config:", err)
@@ -28,23 +28,23 @@ func main() {
 	}
 
 	// Step2: Create Dedicated Channel
-	RequestsChan := make(chan request.RequestsJob, LocalProxy.MaxConcReq)
+	RequestsChan := make(chan request.RequestsJob, ProxySettings.MaxConcReq)
 	// RequestsChan := make(chan []byte, 10000)
 
 	// Step3: Spawn Workers
-	jobWorkers := make([]*workers.Worker, LocalProxy.NumWorkers)
+	jobWorkers := make([]*workers.Worker, ProxySettings.NumWorkers)
 	var workersWg sync.WaitGroup
 
 	for i := range jobWorkers {
 		jobWorkers[i] = &(workers.Worker{Id: uuid.NewString()})
 		workersWg.Add(1)
-		go jobWorkers[i].Start(&LocalProxy, RequestsChan, &workersWg)
+		go jobWorkers[i].Start(&ProxySettings, RequestsChan, &workersWg)
 	}
 
 	// Step4: spawns Listener and listens to the incoming requests.
-	Listener := protocol.NewHTTPListener(LocalProxy.ProxyPort, LocalProxy.MaxConcReq, RequestsChan)
+	Listener := protocol.NewHTTPListener(ProxySettings.ProxyPort, ProxySettings.MaxConcReq, RequestsChan)
 	if Listener == nil {
-		fmt.Printf("Error creating Listener for port %s\n", LocalProxy.ProxyPort)
+		fmt.Printf("Error creating Listener for port %s\n", ProxySettings.ProxyPort)
 		os.Exit(1)
 	}
 

@@ -17,7 +17,7 @@ type Worker struct {
 	Id string
 }
 
-func (w *Worker) Start(LocalProxy *configParser.Proxy, RequestsChan <-chan request.RequestsJob, wg *sync.WaitGroup) {
+func (w *Worker) Start(ProxySettings *configParser.Proxy, RequestsChan <-chan request.RequestsJob, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	client := &http.Client{
@@ -25,16 +25,19 @@ func (w *Worker) Start(LocalProxy *configParser.Proxy, RequestsChan <-chan reque
 	}
 
 	for Req := range RequestsChan {
-		w.handleJob(&Req, client, LocalProxy)
+		w.handleJob(&Req, client, ProxySettings)
 	}
 
 	fmt.Println("Worker stopped")
 }
 
-func (w *Worker) handleJob(job *request.RequestsJob, client *http.Client, localProxy *configParser.Proxy) {
+func (w *Worker) handleJob(job *request.RequestsJob, client *http.Client, ProxySettings *configParser.Proxy) {
 	defer close(job.Done)
 
-	forwardPath := router.GetPath(job, localProxy)
+	// Get the path to the response is being sent to, .
+	// The algorithm is based on the configuration in the config.
+	// The work of load balancing management is also managed by the router.
+	forwardPath := router.GetPath(job, ProxySettings)
 	forwardRequest(job, client, forwardPath)
 }
 
@@ -59,10 +62,10 @@ func forwardRequest(job *request.RequestsJob, client *http.Client, targetURL str
 	io.Copy(job.Writer, resp.Body)
 }
 
-func copyHeaders(src, dst http.Header) {
+func copyHeaders(src, dest http.Header) {
 	for k, vv := range src {
 		for _, v := range vv {
-			dst.Add(k, v)
+			dest.Add(k, v)
 		}
 	}
 }
