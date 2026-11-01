@@ -3,11 +3,14 @@ package protocol
 import (
 	"JerryCop/internal/request"
 	"net/http"
+	"strconv"
+	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
+
+var reqCounter atomic.Uint64
 
 type HTTPListener struct {
 	Server       *http.Server
@@ -42,7 +45,7 @@ func NewHTTPListener(listenAddr string, MaxConcReq int, RequestsChan chan<- requ
 func (s *HTTPListener) handleRequest(w http.ResponseWriter, r *http.Request) {
 	done := make(chan struct{})
 	job := request.RequestsJob{
-		ID:     uuid.NewString(),
+		ID:     strconv.FormatUint(reqCounter.Add(1), 10),
 		Req:    r,
 		Writer: w,
 		Done:   done,

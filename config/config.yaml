@@ -1,27 +1,36 @@
 Proxy:
-  ProxyPort: ":8080"
+  ProxyPort: ':8080'
   NumWorkers: 50
   MaxConcReq: 1000
-  DistAlgo: "RANDOM"
+  DistAlgo: RANDOM
 
 Servers:
   Server1:
-    ServerPorts: ["8001", "8002"]
-    Names: ["backend1", "backend2"]
+    ServerPorts:
+      - '8001'
+      - '8002'
+    Names:
+      - backend1
+      - backend2
     Routing:
-      Prefix: "/"
-      ProxyPass: ["http://127.0.0.1:8001", "http://127.0.0.1:8002"]
+      Prefix: /
+      ProxyPass:
+        - http://127.0.0.1:8001
+        - http://127.0.0.1:8002
       ProxyHeaders:
-        Host: "localhost"
-        XRealIP: "127.0.0.1"
-        XForwardedFor: "127.0.0.1"
+        Host: localhost
+        XRealIP: 127.0.0.1
+        XForwardedFor: 127.0.0.1
   Server2:
-    ServerPorts: ["8003"]
-    Names: ["api_backend"]
+    ServerPorts:
+      - '8003'
+    Names:
+      - api_backend
     Routing:
-      Prefix: "/api"
-      ProxyPass: ["http://127.0.0.1:8003"]
+      Prefix: /api
+      ProxyPass:
+        - http://127.0.0.1:8003
       ProxyHeaders:
-        Host: "localhost"
-        XRealIP: "127.0.0.1"
-        XForwardedFor: "127.0.0.1"
+        Host: localhost
+        XRealIP: 127.0.0.1
+        XForwardedFor: 127.0.0.1
