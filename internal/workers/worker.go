@@ -1,7 +1,7 @@
 package workers
 
 import (
-	request "JerryCop/cmd/request"
+	request "JerryCop/internal/request"
 	configParser "JerryCop/internal/configParser"
 	router "JerryCop/internal/router"
 	"errors"
@@ -82,7 +82,11 @@ func (w *Worker) handleJob(job *request.RequestsJob, client *http.Client, ProxyS
 	// Get the path to the response is being sent to, .
 	// The algorithm is based on the configuration in the config.
 	// The work of load balancing management is also managed by the router.
-	forwardPath := router.GetPath(job, ProxySettings)
+	forwardPath, err := router.GetPath(job, ProxySettings)
+	if err != nil {
+		http.Error(job.Writer, "Bad Gateway", http.StatusBadGateway)
+		return
+	}
 	forwardRequest(job, client, forwardPath)
 }
 
@@ -102,7 +106,7 @@ func forwardRequest(job *request.RequestsJob, client *http.Client, targetURL str
 
 	resp, err := client.Do(upstreamReq)
 	if err != nil {
-		errors.New("failed to execute")
+		http.Error(job.Writer, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()

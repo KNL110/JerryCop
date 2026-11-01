@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"JerryCop/cmd/request"
+	"JerryCop/internal/request"
 	"net/http"
 	"time"
 

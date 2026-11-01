@@ -1,8 +1,8 @@
 package main
 
 import (
-	request "JerryCop/cmd/request"
-	workers "JerryCop/cmd/workers"
+	request "JerryCop/internal/request"
+	workers "JerryCop/internal/workers"
 	configparser "JerryCop/internal/configParser"
 	"JerryCop/internal/protocol"
 	"fmt"

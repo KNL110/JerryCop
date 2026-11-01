@@ -11,7 +11,7 @@ import (
 
 type State struct {
 	LastConnection   InternalServer
-	IsInternalServer map[string]bool
+	IsInternalServer map[string]struct{}
 	NumOfConns       map[InternalServer]int
 	TotalServers     int
 }
@@ -21,11 +21,11 @@ type InternalServer struct {
 }
 
 func (State) NewState(configSettings *configparser.Proxy) State {
-	var NumofConns map[InternalServer]int
-	for server := range 
-	
 	state := State{
-		
+		LastConnection: InternalServer{},
+		IsInternalServer: make(map[string]struct{}),
+		NumOfConns: make(map[InternalServer]int),
+		TotalServers: len(configSettings.ServerConfig),
 	}
 
 	return state

@@ -11,7 +11,7 @@ import (
 // While the stateTracker deals with the information
 // tracking about the Connections and Servers at the runtime.
 
-// Note to self: Based on the layout of config.yaml
+// Note: Based on the layout of config.yaml
 
 // Proxy holds the proxy's runtime configuration and the configuration
 // of all registered backend server groups.
@@ -19,12 +19,14 @@ import (
 // ProxyPort specifies the address on which the proxy listens.
 // NumWorkers specifies the number of workers used to process requests.
 // MaxConcReq specifies the configured maximum number of concurrent requests.
+// DistAlgo specifies the algorithm used to determine who to forward the request to among eligible candidates.
 // Servers maps server identifiers to their respective configurations.
 // ServerConfig contains the server configurations as a slice for convenient iteration.
 type Proxy struct {
 	ProxyPort    string                  `yaml:"ProxyPort"`
 	NumWorkers   int                     `yaml:"NumWorkers"`
 	MaxConcReq   int                     `yaml:"MaxConcReq"`
+	DistAlgo     string                  `yaml:"DistAlgo"`
 	Servers      map[string]ServerConfig `yaml:"Servers"`
 	ServerConfig []ServerConfig          `yaml:"ServerConfig"`
 }
@@ -70,6 +72,7 @@ type configFile struct {
 		ProxyPort  string `yaml:"ProxyPort"`
 		NumWorkers int    `yaml:"NumWorkers"`
 		MaxConcReq int    `yaml:"MaxConcReq"`
+		DistAlgo   string `yaml:"DistAlgo"`
 	} `yaml:"Proxy"`
 	Servers map[string]ServerConfig `yaml:"Servers"`
 }
@@ -94,7 +97,9 @@ func LoadConfig() (Proxy, error) {
 		ProxyPort:  rawConfig.Proxy.ProxyPort,
 		NumWorkers: rawConfig.Proxy.NumWorkers,
 		MaxConcReq: rawConfig.Proxy.MaxConcReq,
-		Servers:    rawConfig.Servers,
+		DistAlgo:   rawConfig.Proxy.DistAlgo,
+
+		Servers: rawConfig.Servers,
 	}
 
 	for _, sc := range rawConfig.Servers {
@@ -106,9 +111,11 @@ func LoadConfig() (Proxy, error) {
 
 func defaultProxy() Proxy {
 	return Proxy{
-		ProxyPort:    ":8080",
-		NumWorkers:   10,
-		MaxConcReq:   1000,
+		ProxyPort:  ":8080",
+		NumWorkers: 10,
+		MaxConcReq: 1000,
+		DistAlgo:   "RANDOM",
+
 		Servers:      make(map[string]ServerConfig),
 		ServerConfig: []ServerConfig{},
 	}
