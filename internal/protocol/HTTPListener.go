@@ -15,18 +15,18 @@ var reqCounter atomic.Uint64
 
 type HTTPListener struct {
 	Server       *http.Server
-	RequestsChan chan<- request.RequestsJob
+	ShardedChans []chan request.RequestsJob
 }
 
-func NewHTTPListener(listenAddr string, MaxConcReq int, RequestsChan chan<- request.RequestsJob) *HTTPListener {
-	if RequestsChan == nil {
+func NewHTTPListener(listenAddr string, MaxConcReq int, ShardedChans []chan request.RequestsJob) *HTTPListener {
+	if ShardedChans == nil {
 		return nil
 	}
 
 	mux := mux.NewRouter()
 
 	listener := &HTTPListener{
-		RequestsChan: RequestsChan,
+		ShardedChans: ShardedChans,
 	}
 
 	mux.PathPrefix("/").HandlerFunc(listener.handleRequest)
@@ -65,14 +65,16 @@ var doneChanPool = sync.Pool{
 func (s *HTTPListener) handleRequest(w http.ResponseWriter, r *http.Request) {
     done := doneChanPool.Get().(chan struct{})
     
+    id := reqCounter.Add(1)
     job := request.RequestsJob{
-        ID:     strconv.FormatUint(reqCounter.Add(1), 10),
+        ID:     strconv.FormatUint(id, 10),
         Req:    r,
         Writer: w,
         Done:   done,
     }
-
-    s.RequestsChan <- job
+	
+	shard := id % uint64(len(s.ShardedChans))
+	s.ShardedChans[shard] <- job
     <-done
 
     // Put back into pool for reuse (must be drained or non-closed)

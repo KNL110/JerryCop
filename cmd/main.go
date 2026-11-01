@@ -1,14 +1,15 @@
 package main
 
 import (
-	request "JerryCop/internal/request"
-	workers "JerryCop/internal/workers"
 	configparser "JerryCop/internal/configParser"
 	"JerryCop/internal/protocol"
+	request "JerryCop/internal/request"
+	workers "JerryCop/internal/workers"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 
@@ -27,23 +28,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Step2: Create Dedicated Channel
-	// The Channel is size 5 times the max concurrent requests, the number 5 is based on nothing.
-	RequestsChan := make(chan request.RequestsJob, 5*ProxySettings.MaxConcReq)
-	// RequestsChan := make(chan []byte, 10000)
+	// Step2: Create Dedicated Channels
+	numShards := runtime.NumCPU()
+	shardedChans := make([]chan request.RequestsJob, numShards)
+	for i := 0; i < numShards; i++ {
+		shardedChans[i] = make(chan request.RequestsJob, ProxySettings.MaxConcReq/numShards)
+	}
 
 	// Step3: Spawn Workers
-	jobWorkers := make([]*workers.Worker, ProxySettings.NumWorkers)
 	var workersWg sync.WaitGroup
 
-	for i := range jobWorkers {
-		jobWorkers[i] = &(workers.Worker{Id: uuid.NewString()})
-		workersWg.Add(1)
-		go jobWorkers[i].Start(&ProxySettings, RequestsChan, &workersWg)
+	workersPerShard := ProxySettings.NumWorkers / numShards
+	for shardIdx := 0; shardIdx < numShards; shardIdx++ {
+		for w := 0; w < workersPerShard; w++ {
+			worker := &workers.Worker{Id: uuid.NewString()}
+			workersWg.Add(1)
+			go worker.Start(&ProxySettings, shardedChans[shardIdx], &workersWg)
+		}
 	}
 
 	// Step4: spawns Listener and listens to the incoming requests.
-	Listener := protocol.NewHTTPListener(ProxySettings.ProxyPort, ProxySettings.MaxConcReq, RequestsChan)
+	Listener := protocol.NewHTTPListener(ProxySettings.ProxyPort, ProxySettings.MaxConcReq, shardedChans)
 	if Listener == nil {
 		fmt.Printf("Error creating Listener for port %s\n", ProxySettings.ProxyPort)
 		os.Exit(1)
@@ -66,7 +71,9 @@ func main() {
 	_ = Listener.Server.Close()
 
 	// Tell the workers threads to stop taking the requests.
-	close(RequestsChan)
+	for _, ch := range shardedChans {
+		close(ch)
+	}
 	// Wait till the worker threads are done with their workload.
 	workersWg.Wait()
 

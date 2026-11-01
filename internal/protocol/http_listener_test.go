@@ -17,7 +17,7 @@ func TestNewHTTPListener(t *testing.T) {
 	}
 
 	ch := make(chan request.RequestsJob, 10)
-	listener := NewHTTPListener(":8080", 100, ch)
+	listener := NewHTTPListener(":8080", 100, []chan request.RequestsJob{ch})
 	if listener == nil {
 		t.Fatal("expected non-nil listener")
 	}
@@ -72,7 +72,7 @@ func TestLimitMiddleware(t *testing.T) {
 
 func TestHTTPListener_HandleRequest(t *testing.T) {
 	ch := make(chan request.RequestsJob, 1)
-	listener := &HTTPListener{RequestsChan: ch}
+	listener := &HTTPListener{ShardedChans: []chan request.RequestsJob{ch}}
 
 	req := httptest.NewRequest("GET", "/api/items?cat=books", nil)
 	rec := httptest.NewRecorder()
