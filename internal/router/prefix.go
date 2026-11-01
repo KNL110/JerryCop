@@ -7,8 +7,7 @@ import (
 	"strings"
 )
 
-// MatchPrefix checks if the request path matches the given prefix,
-// respecting URL path boundaries so "/api" won't match "/apikey".
+// MatchPrefix checks if the request path matches the given prefix
 func MatchPrefix(reqPath, prefix string) bool {
 	if prefix == "" || prefix == "/" {
 		return true

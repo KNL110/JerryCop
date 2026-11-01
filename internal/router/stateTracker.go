@@ -2,6 +2,7 @@ package router
 
 import (
 	configparser "JerryCop/internal/configParser"
+	"sync/atomic"
 )
 
 // Although the config and stateTracker both deal with the servers,
@@ -14,6 +15,7 @@ type State struct {
 	IsInternalServer map[string]struct{}
 	NumOfConns       map[InternalServer]int
 	TotalServers     int
+	RoundRobinIndex  map[string]*atomic.Uint64
 }
 
 type InternalServer struct {
@@ -22,10 +24,16 @@ type InternalServer struct {
 
 func (State) NewState(configSettings *configparser.Proxy) State {
 	state := State{
-		LastConnection: InternalServer{},
+		LastConnection:   InternalServer{},
 		IsInternalServer: make(map[string]struct{}),
-		NumOfConns: make(map[InternalServer]int),
-		TotalServers: len(configSettings.ServerConfig),
+		NumOfConns:       make(map[InternalServer]int),
+		TotalServers:     len(configSettings.ServerConfig),
+		RoundRobinIndex:  make(map[string]*atomic.Uint64),
+	}
+
+	for _, server := range configSettings.ServerConfig {
+		prefix := server.ServerRouting.Prefix
+		state.RoundRobinIndex[prefix] = new(atomic.Uint64)
 	}
 
 	return state

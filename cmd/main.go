@@ -28,7 +28,8 @@ func main() {
 	}
 
 	// Step2: Create Dedicated Channel
-	RequestsChan := make(chan request.RequestsJob, ProxySettings.MaxConcReq)
+	// The Channel is size 5 times the max concurrent requests, the number 5 is based on nothing.
+	RequestsChan := make(chan request.RequestsJob, 5*ProxySettings.MaxConcReq)
 	// RequestsChan := make(chan []byte, 10000)
 
 	// Step3: Spawn Workers
