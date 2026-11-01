@@ -50,10 +50,18 @@ type Worker struct {
 func (w *Worker) Start(ProxySettings *configParser.Proxy, RequestsChan <-chan request.RequestsJob, wg *sync.WaitGroup) {
 	defer wg.Done()
 
+	var jobWg sync.WaitGroup
+
 	for job := range RequestsChan {
-		w.handleJob(&job, defaultClient, ProxySettings)
+		jobCopy := job
+		jobWg.Add(1)
+		go func() {
+			defer jobWg.Done()
+			w.handleJob(&jobCopy, defaultClient, ProxySettings)
+		}()
 	}
 
+	jobWg.Wait()
 }
 
 // HandleJob determines the internal servers' destination for a request and forwards it.

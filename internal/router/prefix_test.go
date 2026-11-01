@@ -78,3 +78,10 @@ func TestBuildTargetURL(t *testing.T) {
 		t.Errorf("BuildTargetURL = %s; want %s", target, expected)
 	}
 }
+
+func BenchmarkBuildTargetURL(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _ = BuildTargetURL("http://localhost:8080", "/api/users", "id=123&sort=asc")
+	}
+}

@@ -2,8 +2,6 @@ package router
 
 import (
 	configparser "JerryCop/internal/configParser"
-	"net/url"
-	"path"
 	"strings"
 )
 
@@ -35,16 +33,25 @@ func FindMatchingServer(reqPath string, servers []configparser.ServerConfig) (*c
 // BuildTargetURL joins the upstream base server URL with the request path
 // and preserves the original query parameters.
 func BuildTargetURL(upstreamBase, reqPath, rawQuery string) (string, error) {
-	targetURL, err := url.Parse(upstreamBase)
-	if err != nil {
-		return "", err
+	base := strings.TrimRight(upstreamBase, "/")
+	p := reqPath
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
 	}
 
-	targetURL.Path = path.Join(targetURL.Path, reqPath)
-	if strings.HasSuffix(reqPath, "/") && !strings.HasSuffix(targetURL.Path, "/") {
-		targetURL.Path += "/"
+	totalLen := len(base) + len(p)
+	if rawQuery != "" {
+		totalLen += 1 + len(rawQuery)
 	}
-	targetURL.RawQuery = rawQuery
 
-	return targetURL.String(), nil
+	var b strings.Builder
+	b.Grow(totalLen)
+	b.WriteString(base)
+	b.WriteString(p)
+	if rawQuery != "" {
+		b.WriteByte('?')
+		b.WriteString(rawQuery)
+	}
+
+	return b.String(), nil
 }

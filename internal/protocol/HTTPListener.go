@@ -4,7 +4,6 @@ import (
 	"JerryCop/internal/request"
 	"net/http"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -43,42 +42,20 @@ func NewHTTPListener(listenAddr string, MaxConcReq int, ShardedChans []chan requ
 	return listener
 }
 
-// func (s *HTTPListener) handleRequest(w http.ResponseWriter, r *http.Request) {
-// 	done := make(chan struct{})
-// 	job := request.RequestsJob{
-// 		ID:     strconv.FormatUint(reqCounter.Add(1), 10),
-// 		Req:    r,
-// 		Writer: w,
-// 		Done:   done,
-// 	}
-
-// 	s.RequestsChan <- job
-// 	<-done
-// }
-
-var doneChanPool = sync.Pool{
-    New: func() any {
-        return make(chan struct{})
-    },
-}
-
 func (s *HTTPListener) handleRequest(w http.ResponseWriter, r *http.Request) {
-    done := doneChanPool.Get().(chan struct{})
-    
-    id := reqCounter.Add(1)
-    job := request.RequestsJob{
-        ID:     strconv.FormatUint(id, 10),
-        Req:    r,
-        Writer: w,
-        Done:   done,
-    }
-	
+	done := make(chan struct{})
+
+	id := reqCounter.Add(1)
+	job := request.RequestsJob{
+		ID:     strconv.FormatUint(id, 10),
+		Req:    r,
+		Writer: w,
+		Done:   done,
+	}
+
 	shard := id % uint64(len(s.ShardedChans))
 	s.ShardedChans[shard] <- job
-    <-done
-
-    // Put back into pool for reuse (must be drained or non-closed)
-    // Note: since handleJob closes job.Done, you recreate or use a 1-capacity buffered struct{}:
+	<-done
 }
 
 
