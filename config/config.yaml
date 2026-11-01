@@ -2,7 +2,7 @@ Proxy:
   ProxyPort: ":8080"
   NumWorkers: 3000
   MaxConcReq: 20000
-  DistAlgo: RANDOM
+  DistAlgo: ROUND_ROBIN
 
 Servers:
   Server1:

@@ -1,11 +1,144 @@
-let me tell you the entire intended flow then you criticise the code that is written and assume the code that is not written to be according to what i said
+# JerryCop
 
-there are 4 stages of initialisations when program starts,
+A high-performance, concurrent reverse proxy and layer-7 load balancer built in Go.
 
-1. the config is loaded in memory, it will include some general behaviour info then list out servers witht their own rules
+Designed for low-latency request routing and traffic management, JerryCop combines a CPU-sharded worker architecture with prefix-based path routing, active load balancing, and concurrency limiting to protect upstream backend services from overload.
 
-2. we create a channel that is monitored by the workers that are yet to be created will need the structure of this channel to also accomodate the writer, as it will be needed when we are sending the response back; i'm thinking we create this struct called job, it will have the raw request, the writer and some id so we can track it better.
+---
 
-3. then we start the http listener that just listens to whatever is coming at the proxy server, and puts it in the channel. the max concurrent connections is limited by using the semaphore structure. the listeners here has to keep the connection open till the backend sends the reponse otherwise the client will get the wrong signal about the connection being closed.
+## Key Features
 
-4. then the workers are initiated it picks one from the channel, asks the algorithm where to send this to and what to change about the raw request, the algorithm checks if where this is coming from, is it from the backend servers that are listed in config or not and tells exactly what to do. the workers then make their own concurrent requests (each a go function, i'm thinking of capping it at 10) and whenever they are done, go back to the same loop while the main program stops in the blocking condition so nothing stops working
+- **High-Throughput Sharded Dispatcher**: Partitions incoming requests across dedicated CPU core shards to minimize channel lock contention under heavy concurrency.
+- **Traffic Routing & Longest Prefix Matching (LPM)**: Intelligently routes paths (e.g. `/`, `/api`, `/api/v1`) to designated upstream server groups.
+- **Pluggable Load Balancing**:
+  - `ROUND_ROBIN`: Atomic state-tracked rotation across backend servers.
+  - `RANDOM`: Low-overhead uniform pseudo-random distribution.
+- **Built-in Rate Limiting & Concurrency Throttling**: Semaphore-guarded connection thresholds (`MaxConcReq`) to prevent server saturation, thread pool exhaustion, and backpressure collapse.
+- **Optimized Network I/O**:
+  - Upstream HTTP keep-alive connection pooling via reusable transports.
+  - Recycled 32 KB copy buffers via `sync.Pool` to minimize GC pressure during large data transfers.
+  - Fast single-pass target URL construction with zero intermediate URL re-parsing.
+  - RFC 7230-compliant hop-by-hop header sanitization (`Connection`, `Keep-Alive`, `Upgrade`, etc.).
+
+---
+
+## Architecture Overview
+
+```
+                      ┌──────────────────────┐
+                      │  Incoming HTTP Req   │
+                      └──────────┬───────────┘
+                                 │
+                                 ▼
+                     ┌────────────────────────┐
+                     │    limitMiddleware     │ (Semaphore / MaxConcReq)
+                     └───────────┬────────────┘
+                                 │
+                                 ▼
+                     ┌────────────────────────┐
+                     │      HTTPListener      │ (id % numShards)
+                     └───────────┬────────────┘
+                                 │
+             ┌───────────────────┼───────────────────┐
+             ▼                   ▼                   ▼
+     ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+     │ Shard Chan 0  │   │ Shard Chan 1  │   │ Shard Chan N  │
+     └───────┬───────┘   └───────┬───────┘   └───────┬───────┘
+             │                   │                   │
+             ▼                   ▼                   ▼
+     ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+     │ Worker Pool 0 │   │ Worker Pool 1 │   │ Worker Pool N │
+     └───────┬───────┘   └───────┬───────┘   └───────┬───────┘
+             │                   │                   │
+             └───────────────────┼───────────────────┘
+                                 │
+                                 ▼
+                     ┌────────────────────────┐
+                     │   Router & LoadBal     │ (LPM + RoundRobin / Random)
+                     └───────────┬────────────┘
+                                 │
+                                 ▼
+                     ┌────────────────────────┐
+                     │   Upstream Backends    │
+                     └────────────────────────┘
+```
+
+---
+
+## Configuration
+
+JerryCop is configured via `config/config.yaml`:
+
+```yaml
+Proxy:
+  ProxyPort: ":8080"
+  NumWorkers: 3000
+  MaxConcReq: 20000
+  DistAlgo: ROUND_ROBIN # Options: ROUND_ROBIN, RANDOM
+
+Servers:
+  Server1:
+    ServerPorts:
+      - "8001"
+      - "8002"
+    Names:
+      - backend1
+      - backend2
+    Routing:
+      Prefix: /
+      ProxyPass:
+        - http://127.0.0.1:8001
+        - http://127.0.0.1:8002
+      ProxyHeaders:
+        Host: localhost
+        XRealIP: 127.0.0.1
+        XForwardedFor: 127.0.0.1
+
+  Server2:
+    ServerPorts:
+      - "8003"
+    Names:
+      - api_backend
+    Routing:
+      Prefix: /api
+      ProxyPass:
+        - http://127.0.0.1:8003
+      ProxyHeaders:
+        Host: localhost
+        XRealIP: 127.0.0.1
+        XForwardedFor: 127.0.0.1
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Go 1.22+
+
+### Running the Proxy
+
+```bash
+# Run directly
+go run ./cmd/main.go
+
+# Or using Makefile
+make run
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+go test -v ./...
+
+# Or using Makefile
+make test
+```
+
+### Building Binary
+
+```bash
+# Build standalone binary into bin/
+make build
+```
