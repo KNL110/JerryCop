@@ -1,14 +1,14 @@
 Proxy:
-  ProxyPort: ':8080'
-  NumWorkers: 50
-  MaxConcReq: 1000
+  ProxyPort: ":8080"
+  NumWorkers: 3000
+  MaxConcReq: 20000
   DistAlgo: RANDOM
 
 Servers:
   Server1:
     ServerPorts:
-      - '8001'
-      - '8002'
+      - "8001"
+      - "8002"
     Names:
       - backend1
       - backend2
@@ -23,7 +23,7 @@ Servers:
         XForwardedFor: 127.0.0.1
   Server2:
     ServerPorts:
-      - '8003'
+      - "8003"
     Names:
       - api_backend
     Routing:

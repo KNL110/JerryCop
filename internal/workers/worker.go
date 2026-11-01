@@ -1,11 +1,9 @@
 package workers
 
 import (
-	request "JerryCop/internal/request"
 	configParser "JerryCop/internal/configParser"
+	request "JerryCop/internal/request"
 	router "JerryCop/internal/router"
-	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"sync"
@@ -16,9 +14,8 @@ import (
 // Idle connections are kept alive so they can be reused
 // instead of creating new connection.
 var defaultTransport = &http.Transport{
-	Proxy:               http.ProxyFromEnvironment,
-	MaxIdleConns:        10000,
-	MaxIdleConnsPerHost: 1000,
+	MaxIdleConns:        20000,
+	MaxIdleConnsPerHost: 5000,
 	IdleConnTimeout:     90 * time.Second,
 }
 
@@ -48,7 +45,7 @@ type Worker struct {
 // all jobs launched by this worker to finish before returning.
 //
 // Note: There is no limit to the number of concurrent
-// jobs handled by a worker concurrently, that is but still it is capped by 
+// jobs handled by a worker concurrently, that is but still it is capped by
 // the number of jobs in the channel which has an limit on it
 func (w *Worker) Start(ProxySettings *configParser.Proxy, RequestsChan <-chan request.RequestsJob, wg *sync.WaitGroup) {
 	defer wg.Done()
@@ -57,7 +54,6 @@ func (w *Worker) Start(ProxySettings *configParser.Proxy, RequestsChan <-chan re
 		w.handleJob(&job, defaultClient, ProxySettings)
 	}
 
-	fmt.Println("Worker stopped")
 }
 
 // HandleJob determines the internal servers' destination for a request and forwards it.
@@ -81,6 +77,19 @@ func (w *Worker) handleJob(job *request.RequestsJob, client *http.Client, ProxyS
 	forwardRequest(job, client, forwardPath)
 }
 
+// Hop-by-hop headers that must not be forwarded by a proxy (RFC 7230 Section 6.1).
+var hopHeaders = map[string]bool{
+	"Connection":          true,
+	"Proxy-Connection":    true,
+	"Keep-Alive":          true,
+	"Proxy-Authenticate":  true,
+	"Proxy-Authorization": true,
+	"Te":                  true,
+	"Trailer":             true,
+	"Transfer-Encoding":   true,
+	"Upgrade":             true,
+}
+
 // ForwardRequest sends an incoming request to a internal server and relays
 // the internal server's response to the original client.
 //
@@ -89,10 +98,12 @@ func (w *Worker) handleJob(job *request.RequestsJob, client *http.Client, ProxyS
 func forwardRequest(job *request.RequestsJob, client *http.Client, targetURL string) {
 	upstreamReq, err := http.NewRequest(job.Req.Method, targetURL, job.Req.Body)
 	if err != nil {
-		errors.New("failed to ")
+		http.Error(job.Writer, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
 
+	// Preserve content length for POST/PUT payloads
+	upstreamReq.ContentLength = job.Req.ContentLength
 	copyHeaders(job.Req.Header, upstreamReq.Header)
 
 	resp, err := client.Do(upstreamReq)
@@ -110,10 +121,12 @@ func forwardRequest(job *request.RequestsJob, client *http.Client, targetURL str
 	io.CopyBuffer(job.Writer, resp.Body, *buf)
 }
 
-// This function does not clear existing destination headers or filter
-// hop-by-hop headers.
+// CopyHeaders copies headers while filtering out hop-by-hop transport headers.
 func copyHeaders(src, dest http.Header) {
 	for k, vv := range src {
+		if hopHeaders[k] {
+			continue
+		}
 		for _, v := range vv {
 			dest.Add(k, v)
 		}
