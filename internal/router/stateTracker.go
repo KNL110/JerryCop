@@ -13,7 +13,7 @@ import (
 type State struct {
 	LastConnection   InternalServer
 	IsInternalServer map[string]struct{}
-	NumOfConns       map[InternalServer]int
+	NumOfConns       map[string]*atomic.Int64
 	TotalServers     int
 	RoundRobinIndex  map[string]*atomic.Uint64
 }
@@ -23,17 +23,29 @@ type InternalServer struct {
 }
 
 func (State) NewState(configSettings *configparser.Proxy) State {
+	totalServers := 0
+	if configSettings != nil {
+		totalServers = len(configSettings.ServerConfig)
+	}
+
 	state := State{
 		LastConnection:   InternalServer{},
 		IsInternalServer: make(map[string]struct{}),
-		NumOfConns:       make(map[InternalServer]int),
-		TotalServers:     len(configSettings.ServerConfig),
+		NumOfConns:       make(map[string]*atomic.Int64),
+		TotalServers:     totalServers,
 		RoundRobinIndex:  make(map[string]*atomic.Uint64),
 	}
 
-	for _, server := range configSettings.ServerConfig {
-		prefix := server.ServerRouting.Prefix
-		state.RoundRobinIndex[prefix] = new(atomic.Uint64)
+	if configSettings != nil {
+		for _, server := range configSettings.ServerConfig {
+			for _, routing := range server.ServerRouting {
+				state.RoundRobinIndex[routing.Prefix] = new(atomic.Uint64)
+				for _, upstream := range routing.ProxyPass {
+					state.IsInternalServer[upstream] = struct{}{}
+					state.NumOfConns[upstream] = new(atomic.Int64)
+				}
+			}
+		}
 	}
 
 	return state

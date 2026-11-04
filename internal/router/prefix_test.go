@@ -32,37 +32,40 @@ func TestMatchPrefix(t *testing.T) {
 func TestFindMatchingServer_LPM(t *testing.T) {
 	servers := []configparser.ServerConfig{
 		{
-			ServerRouting: configparser.Routing{
-				Prefix:    "/",
-				ProxyPass: []string{"http://root-backend"},
+			ServerRouting: []configparser.Routing{
+				{
+					Prefix:    "/",
+					ProxyPass: []string{"http://root-backend"},
+				},
 			},
 		},
 		{
-			ServerRouting: configparser.Routing{
-				Prefix:    "/api",
-				ProxyPass: []string{"http://api-backend"},
-			},
-		},
-		{
-			ServerRouting: configparser.Routing{
-				Prefix:    "/api/v1",
-				ProxyPass: []string{"http://v1-backend"},
+			// Single server with multiple prefixes
+			ServerRouting: []configparser.Routing{
+				{
+					Prefix:    "/api",
+					ProxyPass: []string{"http://api-backend"},
+				},
+				{
+					Prefix:    "/api/v1",
+					ProxyPass: []string{"http://v1-backend"},
+				},
 			},
 		},
 	}
 
 	matched, found := FindMatchingServer("/api/v1/users", servers)
-	if !found || matched.ServerRouting.Prefix != "/api/v1" {
+	if !found || matched.Prefix != "/api/v1" {
 		t.Fatalf("expected /api/v1, got %+v", matched)
 	}
 
 	matched, found = FindMatchingServer("/api/users", servers)
-	if !found || matched.ServerRouting.Prefix != "/api" {
+	if !found || matched.Prefix != "/api" {
 		t.Fatalf("expected /api, got %+v", matched)
 	}
 
 	matched, found = FindMatchingServer("/something-else", servers)
-	if !found || matched.ServerRouting.Prefix != "/" {
+	if !found || matched.Prefix != "/" {
 		t.Fatalf("expected /, got %+v", matched)
 	}
 }

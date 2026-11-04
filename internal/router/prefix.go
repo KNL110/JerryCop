@@ -14,16 +14,18 @@ func MatchPrefix(reqPath, prefix string) bool {
 	return reqPath == prefix || strings.HasPrefix(reqPath, prefix+"/")
 }
 
-// FindMatchingServer finds the ServerConfig with the longest matching prefix.
-func FindMatchingServer(reqPath string, servers []configparser.ServerConfig) (*configparser.ServerConfig, bool) {
-	var bestMatch *configparser.ServerConfig
+// FindMatchingServer finds the Routing with the longest matching prefix across all servers.
+func FindMatchingServer(reqPath string, servers []configparser.ServerConfig) (*configparser.Routing, bool) {
+	var bestMatch *configparser.Routing
 	longest := -1
 
 	for i := range servers {
-		prefix := servers[i].ServerRouting.Prefix
-		if MatchPrefix(reqPath, prefix) && len(prefix) > longest {
-			longest = len(prefix)
-			bestMatch = &servers[i]
+		for j := range servers[i].ServerRouting {
+			prefix := servers[i].ServerRouting[j].Prefix
+			if MatchPrefix(reqPath, prefix) && len(prefix) > longest {
+				longest = len(prefix)
+				bestMatch = &servers[i].ServerRouting[j]
+			}
 		}
 	}
 

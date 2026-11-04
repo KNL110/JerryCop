@@ -96,9 +96,11 @@ func TestWorker_Start(t *testing.T) {
 		DistAlgo: "RANDOM",
 		ServerConfig: []configparser.ServerConfig{
 			{
-				ServerRouting: configparser.Routing{
-					Prefix:    "/",
-					ProxyPass: []string{backend.URL},
+				ServerRouting: []configparser.Routing{
+					{
+						Prefix:    "/",
+						ProxyPass: []string{backend.URL},
+					},
 				},
 			},
 		},
